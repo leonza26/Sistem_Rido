@@ -17,7 +17,7 @@
     </div>
 
     <!-- Grid untuk Statistik Card (Sesuai Wireframe Kasir [cite: 39-40]) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
 
         <!-- Card 1: Total Transaksi Hari Ini -->
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">

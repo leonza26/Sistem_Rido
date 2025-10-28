@@ -10,8 +10,8 @@
         <!-- Menu Pemilik/Admin -->
 
         <!-- Dashboard -->
-        <a href="#" class_comment="Ganti '#' dengan route('admin.dashboard')"
-            class="flex items-center space-x-3 px-4 py-3 rounded-lg bg-blue-50 text-blue-600 font-medium transition-colors duration-200">
+        <a href="{{ route('admin') }}"
+            class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin') ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100' }} font-medium transition-colors duration-200 ">
             <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                 stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -21,8 +21,8 @@
         </a>
 
         <!-- Produk-->
-        <a href="#" class_comment="Ganti '#' dengan route('admin.produk')"
-            class="flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors duration-200">
+        <a href="{{ route('admin.products') }}"
+            class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.products') ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100' }} font-medium transition-colors duration-200">
 
             <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 stroke-width="1.5" stroke="currentColor">
@@ -33,8 +33,8 @@
         </a>
 
         <!-- Laporan -->
-        <a href="#" class_comment="Ganti '#' dengan route('admin.laporan')"
-            class="flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors duration-200">
+        <a href="{{ route('admin.laporan') }}"
+            class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.laporan') ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100' }} font-medium transition-colors duration-200">
             <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -44,8 +44,8 @@
         </a>
 
         <!-- Pengguna -->
-        <a href="#" class_comment="Ganti '#' dengan route('admin.pengguna')"
-            class="flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors duration-200">
+        <a href="{{ route('admin.manage_pengguna') }}"
+            class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.manage_pengguna') ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100' }} font-medium transition-colors duration-200">
             <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -72,3 +72,5 @@
         </form>
     </div>
 </aside>
+
+

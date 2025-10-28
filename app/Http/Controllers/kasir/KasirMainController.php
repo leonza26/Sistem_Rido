@@ -12,4 +12,14 @@ class KasirMainController extends Controller
     {
         return view('kasir.dashboard');
     }
+
+    public function transaksi()
+    {
+        return view('kasir.transaksi');
+    }
+
+    public function stok_barang()
+    {
+        return view('kasir.stok_barang');
+    }
 }

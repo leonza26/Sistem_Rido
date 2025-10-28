@@ -17,6 +17,9 @@ Route::middleware(['auth', 'verified', 'rolemanager:admin'])->group(function () 
         Route::controller(AdminMainController::class)->group(function () {
 
             Route::get('/dashboard', 'admin')->name('admin');
+            Route::get('/products', 'manageProducts')->name('admin.products');
+            Route::get('/laporan', 'manageLaporan')->name('admin.laporan');
+            Route::get('/manage_pengguna', 'managePengguna')->name('admin.manage_pengguna');
 
         });
     });
@@ -28,6 +31,10 @@ Route::middleware(['auth', 'verified', 'rolemanager:kasir'])->group(function () 
     Route::prefix('kasir')->group(function () {
         Route::controller(KasirMainController::class)->group(function () {
             Route::get('/dashboard', 'index')->name('kasir');
+            // transaksi
+            Route::get('/transaksi', 'transaksi')->name('kasir.transaksi');
+            Route::get('/stok_barang', 'stok_barang')->name('kasir.stok_barang');
+
 
         });
 
@@ -37,10 +44,10 @@ Route::middleware(['auth', 'verified', 'rolemanager:kasir'])->group(function () 
 
 
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
+// Route::middleware('auth')->group(function () {
+//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+// });
 
 require __DIR__.'/auth.php';
