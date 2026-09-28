@@ -76,6 +76,13 @@
 
         <!-- Konten Halaman Dinamis -->
         <main class="flex-1 p-4 sm:p-6 lg:p-8">
+            {{-- pesan saat pengguna membuka halaman yang bukan haknya --}}
+            @if (session('akses_ditolak'))
+                <div class="mb-6 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-sm font-medium text-red-700">
+                    {{ session('akses_ditolak') }}
+                </div>
+            @endif
+
             @yield('content')
         </main>
     </div>

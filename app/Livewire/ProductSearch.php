@@ -26,6 +26,8 @@ class ProductSearch extends Component
 
         return view('livewire.product-search', [
             'products' => $products,
+            // kolom harga modal hanya ditampilkan untuk Pemilik
+            'tampilkanHargaModal' => (bool) auth()->user()?->isPemilik(),
         ]);
     }
 }

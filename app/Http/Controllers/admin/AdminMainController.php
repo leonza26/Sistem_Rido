@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class AdminMainController extends Controller
@@ -194,7 +195,15 @@ class AdminMainController extends Controller
     public function managePengguna()
     {
         $pengguna = User::orderBy('id', 'asc')->get();
-        return view('admin.user.manage_pengguna', compact('pengguna'));
+
+        // pilihan role pada form sesuai hak pengguna yang login
+        // (Pemilik: Pemilik/Admin/Kasir, Admin: Admin/Kasir)
+        $roleOptions = [];
+        foreach (auth()->user()->assignableRoles() as $role) {
+            $roleOptions[$role] = User::ROLE_LABELS[$role];
+        }
+
+        return view('admin.user.manage_pengguna', compact('pengguna', 'roleOptions'));
     }
 
     //  Tambah user
@@ -202,15 +211,17 @@ class AdminMainController extends Controller
     {
         $request->validate([
             'nama' => 'required',
-            'email' => 'required|unique:users,email',
-            'role' => 'required',
+            'email' => 'required|email|unique:users,email',
+            'role' => ['required', Rule::in($request->user()->assignableRoles())],
             'password' => 'required|min:6|same:konfirmasi_password'
+        ], [
+            'role.in' => 'Anda tidak berhak memberikan role tersebut.',
         ]);
 
         User::create([
             'name' => $request->nama,
             'email' => $request->email,
-            'role' => $request->role,
+            'role' => (int) $request->role,
             'password' => Hash::make($request->password),
         ]);
 
@@ -221,18 +232,46 @@ class AdminMainController extends Controller
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
+        $actor = $request->user();
 
-        $request->validate([
+        // Admin hanya boleh mereset password akun Pemilik (pemulihan akses),
+        // tidak boleh mengubah nama, email, maupun role-nya.
+        if ($user->isPemilik() && ! $actor->isPemilik()) {
+            $request->validate([
+                'password' => 'required|min:6|same:konfirmasi_password'
+            ], [
+                'password.required' => 'Admin hanya dapat mereset password akun Pemilik. Isi password baru.',
+            ]);
+
+            $user->update(['password' => Hash::make($request->password)]);
+
+            return redirect()->back()->with('success', 'Password akun Pemilik berhasil direset');
+        }
+
+        // role akun sendiri tidak dapat diubah agar tidak terkunci dari menunya sendiri
+        $bolehUbahRole = $user->id !== $actor->id;
+
+        $rules = [
             'nama' => 'required',
-            'email' => 'required|unique:users,email,' . $id,
-            'role' => 'required',
+            'email' => 'required|email|unique:users,email,' . $id,
+        ];
+
+        if ($bolehUbahRole) {
+            $rules['role'] = ['required', Rule::in($actor->assignableRoles())];
+        }
+
+        $request->validate($rules, [
+            'role.in' => 'Anda tidak berhak memberikan role tersebut.',
         ]);
 
         $data = [
             'name' => $request->nama,
             'email' => $request->email,
-            'role' => $request->role,
         ];
+
+        if ($bolehUbahRole) {
+            $data['role'] = (int) $request->role;
+        }
 
         // kalau password diisi → update
         if ($request->password) {
@@ -249,9 +288,20 @@ class AdminMainController extends Controller
     }
 
     // Hapus user
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        User::findOrFail($id)->delete();
+        $user = User::findOrFail($id);
+        $actor = $request->user();
+
+        if ($user->id === $actor->id) {
+            return redirect()->back()->withErrors(['Anda tidak dapat menghapus akun Anda sendiri.']);
+        }
+
+        if ($user->isPemilik() && ! $actor->isPemilik()) {
+            return redirect()->back()->withErrors(['Admin tidak dapat menghapus akun Pemilik.']);
+        }
+
+        $user->delete();
 
         return redirect()->back()->with('success', 'User berhasil dihapus');
     }
@@ -259,14 +309,21 @@ class AdminMainController extends Controller
     public function storeProduk(Request $request)
     {
         // Validasi data
-        $validatedData = $request->validate([
+        // harga modal hanya diisi oleh Pemilik; produk yang ditambahkan Admin
+        // tersimpan dengan harga modal 0 sampai dilengkapi oleh Pemilik
+        $rules = [
             'nama_produk' => 'required|string|max:255',
             'kategori_id' => 'required|string|max:255',
             'foto_produk' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'harga_modal' => 'required|numeric|min:0',
             'harga' => 'required|numeric|min:0',
             'stok_awal' => 'required|integer|min:0'
-        ]);
+        ];
+
+        if ($request->user()->isPemilik()) {
+            $rules['harga_modal'] = 'required|numeric|min:0';
+        }
+
+        $validatedData = $request->validate($rules);
 
         // dd($validatedData);
 
@@ -284,14 +341,21 @@ class AdminMainController extends Controller
     {
         $produk = Produk::findOrFail($id);
 
-        $validatedData = $request->validate([
+        // harga modal hanya dapat diubah oleh Pemilik;
+        // saat Admin mengubah produk, harga modal lama tetap dipertahankan
+        $rules = [
             'nama_produk' => 'required|string|max:255',
             'foto_produk' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'kategori_id' => 'required|exists:kategoris,id',
-            'harga_modal' => 'required|numeric|min:0',
             'harga'       => 'required|numeric|min:0',
             'stok_awal'   => 'required|integer|min:0'
-        ]);
+        ];
+
+        if ($request->user()->isPemilik()) {
+            $rules['harga_modal'] = 'required|numeric|min:0';
+        }
+
+        $validatedData = $request->validate($rules);
 
         if ($request->hasFile('foto_produk')) {
             // Delete old photo if it exists
@@ -368,9 +432,12 @@ class AdminMainController extends Controller
         return round($diff, 1);
     }
 
-    public function downloadTemplateProduk()
+    public function downloadTemplateProduk(Request $request)
     {
-        return Excel::download(new \App\Exports\ProdukTemplateExport, 'Template_Produk.xlsx');
+        // template untuk Admin tidak memuat kolom Harga Modal
+        $denganHargaModal = $request->user()->isPemilik();
+
+        return Excel::download(new \App\Exports\ProdukTemplateExport($denganHargaModal), 'Template_Produk.xlsx');
     }
 
     public function importProduk(Request $request)
@@ -383,7 +450,10 @@ class AdminMainController extends Controller
         ]);
 
         try {
-            Excel::import(new \App\Imports\ProdukImport, $request->file('file_excel'));
+            // kolom Harga Modal pada file hanya diproses jika yang mengimpor adalah Pemilik
+            $bolehIsiHargaModal = $request->user()->isPemilik();
+
+            Excel::import(new \App\Imports\ProdukImport($bolehIsiHargaModal), $request->file('file_excel'));
             return redirect()->back()->with('success', 'Produk berhasil diimport!');
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['Terjadi kesalahan saat import: ' . $e->getMessage()]);

@@ -108,31 +108,51 @@
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
+                    @php
+                        $warnaRole = [
+                            \App\Models\User::ROLE_PEMILIK => 'bg-indigo-100 text-indigo-700',
+                            \App\Models\User::ROLE_ADMIN => 'bg-blue-100 text-blue-800',
+                            \App\Models\User::ROLE_KASIR => 'bg-green-100 text-green-800',
+                        ];
+                    @endphp
                     @foreach ($pengguna as $users)
-                        <!-- Data Dummy Sesuai Wireframe [cite: 118] -->
+                        @php
+                            $akunSendiri = $users->id === auth()->id();
+                            // Admin hanya dapat mereset password akun Pemilik (tidak dapat mengubah/menghapus)
+                            $hanyaResetPassword = $users->isPemilik() && ! auth()->user()->isPemilik();
+                        @endphp
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $users->id }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ $users->name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                {{ $users->name }}
+                                @if ($akunSendiri)
+                                    <span class="text-xs text-slate-400">(Anda)</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $users->email }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <span
-                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    {{ $users->role === 0 ? 'Admin' : 'Kasir' }}
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $warnaRole[$users->role] ?? 'bg-gray-100 text-gray-400' }}">
+                                    {{ $users->roleLabel() }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                 <button
                                     class="btn-edit btn-edit px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition duration-200"
                                     data-id="{{ $users->id }}" data-nama="{{ $users->name }}"
-                                    data-email="{{ $users->email }}" data-role="{{ $users->role }}">
-                                    Edit
+                                    data-email="{{ $users->email }}" data-role="{{ $users->role }}"
+                                    data-mode="{{ $hanyaResetPassword ? 'reset' : 'edit' }}"
+                                    data-sendiri="{{ $akunSendiri ? '1' : '0' }}">
+                                    {{ $hanyaResetPassword ? 'Reset Password' : 'Edit' }}
                                 </button>
-                                <button
-                                    class="btn-hapus btn-hapus px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition duration-200"
-                                    data-id="{{ $users->id }}">
-                                    Hapus
-                                </button>
+                                @unless ($akunSendiri || $hanyaResetPassword)
+                                    <button
+                                        class="btn-hapus btn-hapus px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition duration-200"
+                                        data-id="{{ $users->id }}">
+                                        Hapus
+                                    </button>
+                                @endunless
                             </td>
                         </tr>
                     @endforeach
@@ -170,14 +190,25 @@
                         <input type="email" id="email" name="email"
                             class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                    <div>
+                    <div id="role-wrapper">
                         <label for="role" class="block text-sm font-medium text-slate-700">Role</label>
+                        {{-- Pemilik dapat memberikan role Pemilik/Admin/Kasir, Admin hanya Admin/Kasir --}}
                         <select id="role" name="role"
                             class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <option value="0">Admin</option>
-                            <option value="1">Kasir</option>
+                            @foreach ($roleOptions as $kodeRole => $labelRole)
+                                <option value="{{ $kodeRole }}" @selected($kodeRole === \App\Models\User::ROLE_KASIR)>
+                                    {{ $labelRole }}
+                                </option>
+                            @endforeach
                         </select>
+                        <p id="role-info" class="text-xs text-gray-500 mt-1 hidden">Role akun Anda sendiri tidak dapat
+                            diubah.</p>
                     </div>
+                    <p id="info-reset"
+                        class="hidden text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                        Sebagai Admin, Anda hanya dapat mengganti password akun Pemilik, misalnya saat Pemilik lupa
+                        password.
+                    </p>
                     <div>
                         <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
                         <input type="password" id="password" name="password"
@@ -259,6 +290,29 @@
             const modalTitle = document.getElementById('modal-title');
             const passwordInput = document.getElementById('password');
 
+            const inputNama = document.getElementById('nama');
+            const inputEmail = document.getElementById('email');
+            const selectRole = document.getElementById('role');
+            const roleWrapper = document.getElementById('role-wrapper');
+            const roleInfo = document.getElementById('role-info');
+            const infoReset = document.getElementById('info-reset');
+
+            const konfirmasiInput = document.getElementById('konfirmasi_password');
+            const placeholderKonfirmasi = konfirmasiInput.placeholder;
+
+            // mengunci/membuka field agar tidak dapat diubah
+            const aturKunci = (input, terkunci) => {
+                input.readOnly = terkunci;
+                input.classList.toggle('bg-gray-100', terkunci);
+                input.classList.toggle('cursor-not-allowed', terkunci);
+            };
+
+            const aturRoleNonaktif = (nonaktif) => {
+                selectRole.disabled = nonaktif;
+                selectRole.classList.toggle('bg-gray-100', nonaktif);
+                selectRole.classList.toggle('cursor-not-allowed', nonaktif);
+            };
+
             // ===== MODAL HAPUS =====
             const modalHapus = document.getElementById('modal-hapus');
             const formHapus = document.getElementById('form-hapus-pengguna');
@@ -268,19 +322,50 @@
             const bukaModal = (mode = 'tambah', data = null) => {
                 form.reset();
 
-                if (mode === 'edit') {
-                    modalTitle.textContent = 'Edit Pengguna';
-                    passwordInput.placeholder = 'Kosongkan jika tidak ingin mengubah';
+                // kondisi awal: semua field dapat diisi
+                aturKunci(inputNama, false);
+                aturKunci(inputEmail, false);
+                aturRoleNonaktif(false);
+                roleWrapper.classList.remove('hidden');
+                roleInfo.classList.add('hidden');
+                infoReset.classList.add('hidden');
+                passwordInput.required = false;
+                konfirmasiInput.required = false;
+                konfirmasiInput.placeholder = placeholderKonfirmasi;
 
+                if (mode === 'edit' || mode === 'reset') {
                     // isi data
                     document.getElementById('pengguna-id').value = data.id;
-                    document.getElementById('nama').value = data.nama;
-                    document.getElementById('email').value = data.email;
-                    document.getElementById('role').value = data.role;
+                    inputNama.value = data.nama;
+                    inputEmail.value = data.email;
+                    selectRole.value = data.role;
 
                     // set action update
                     form.action = `/admin/users/${data.id}`;
                     methodField.value = 'PUT';
+
+                    if (mode === 'reset') {
+                        // Admin hanya dapat mereset password akun Pemilik
+                        modalTitle.textContent = 'Reset Password Pemilik';
+                        passwordInput.placeholder = 'Password baru untuk Pemilik';
+                        passwordInput.required = true;
+                        konfirmasiInput.placeholder = 'Ulangi password baru';
+                        konfirmasiInput.required = true;
+                        aturKunci(inputNama, true);
+                        aturKunci(inputEmail, true);
+                        aturRoleNonaktif(true);
+                        roleWrapper.classList.add('hidden');
+                        infoReset.classList.remove('hidden');
+                    } else {
+                        modalTitle.textContent = 'Edit Pengguna';
+                        passwordInput.placeholder = 'Kosongkan jika tidak ingin mengubah';
+
+                        // role akun sendiri tidak dapat diubah
+                        if (data.sendiri === '1') {
+                            aturRoleNonaktif(true);
+                            roleInfo.classList.remove('hidden');
+                        }
+                    }
 
                 } else {
                     modalTitle.textContent = 'Tambah Pengguna Baru';
@@ -321,9 +406,10 @@
                         nama: button.dataset.nama,
                         email: button.dataset.email,
                         role: button.dataset.role,
+                        sendiri: button.dataset.sendiri,
                     };
 
-                    bukaModal('edit', data);
+                    bukaModal(button.dataset.mode || 'edit', data);
                 });
             });
 

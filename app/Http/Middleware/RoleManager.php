@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,44 +11,40 @@ use Symfony\Component\HttpFoundation\Response;
 class RoleManager
 {
     /**
-     * Handle an incoming request.
+     * Membatasi akses route berdasarkan role pengguna.
+     * Satu route boleh diakses lebih dari satu role,
+     * contoh: ->middleware('rolemanager:pemilik,admin')
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next, $role): Response
+    public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        // mengecek apakaha tidak ada  autentikasi
+        // mengecek apakah pengguna belum login
         if (! Auth::check()) {
             return redirect()->route('login');
         }
 
-        // menegcek apakah ada autentikasi login berdasarkana role
-        $authUserRole = Auth::user()->role;
+        $user = Auth::user();
 
-        switch ($role) {
-            case 'admin':
-                if ($authUserRole == 0) {
-                    return $next($request);
-                }
-                break;
+        // role tidak dikenal (data tidak valid): keluarkan pengguna dari sistem
+        if ($user->homeRoute() === null) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-            case 'kasir':
-                if ($authUserRole == 1) {
-                    return $next($request);
-                }
-                break;
-
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Role akun Anda tidak valid. Hubungi pemilik atau admin.']);
         }
 
-        // mengarahkan role ke halaman route
-        switch ($authUserRole) {
-            case 0:
-                return redirect()->route('admin');
+        // mengubah nama role pada route (pemilik/admin/kasir) menjadi kode role
+        $allowedRoles = array_map(fn ($role) => User::ROLES[$role] ?? null, $roles);
 
-            case 1:
-                return redirect()->route('kasir');
-
+        if (in_array($user->role, $allowedRoles, true)) {
+            return $next($request);
         }
 
+        // tidak berhak: arahkan ke halaman awal sesuai role
+        return redirect()->route($user->homeRoute())
+            ->with('akses_ditolak', 'Anda tidak memiliki hak akses ke halaman tersebut.');
     }
 }
