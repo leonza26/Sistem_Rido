@@ -113,8 +113,10 @@ class AdminMainController extends Controller
     {
         $start_date = $request->input('tanggal_awal');
         $end_date = $request->input('tanggal_akhir');
+        // filter metode pembayaran (dipakai pemilik untuk rekonsiliasi QRIS dengan Livin' Merchant)
+        $metode = $request->input('metode');
 
-        $baseQuery = Transaksi::query();
+        $baseQuery = Transaksi::query()->metode($metode);
 
         if ($start_date && $end_date) {
             $baseQuery->whereBetween('transaction_date', [
@@ -181,6 +183,7 @@ class AdminMainController extends Controller
             'transaksis',
             'start_date',
             'end_date',
+            'metode',
             'totalPendapatan',
             'totalTunai',
             'totalNonTunai',
@@ -389,8 +392,9 @@ class AdminMainController extends Controller
     {
         $start = $request->tanggal_awal;
         $end = $request->tanggal_akhir;
+        $metode = $request->metode;
 
-        $query = Transaksi::with(['details.produk']);
+        $query = Transaksi::with(['details.produk'])->metode($metode);
         if ($start && $end) {
             $query->whereBetween('transaction_date', [
                 Carbon::parse($start)->startOfDay(),
@@ -404,7 +408,7 @@ class AdminMainController extends Controller
         $totalModal = $transaksis->sum('total_modal');
         $totalLabaKotor = $totalPendapatan - $totalModal;
 
-        $pdf = Pdf::loadView('admin.pdf_template', compact('transaksis', 'start', 'end', 'totalPendapatan', 'totalModal', 'totalLabaKotor'));
+        $pdf = Pdf::loadView('admin.pdf_template', compact('transaksis', 'start', 'end', 'metode', 'totalPendapatan', 'totalModal', 'totalLabaKotor'));
         return $pdf->download('Laporan_Transaksi_' . now()->format('Ymd') . '.pdf');
     }
 
@@ -412,10 +416,9 @@ class AdminMainController extends Controller
     {
         $start = $request->tanggal_awal;
         $end = $request->tanggal_akhir;
+        $metode = $request->metode;
 
-        // dd(Transaksi::all()->toArray());
-
-        return Excel::download(new TransactionsExport($start, $end), 'Laporan_Transaksi.xlsx');
+        return Excel::download(new TransactionsExport($start, $end, $metode), 'Laporan_Transaksi.xlsx');
     }
 
     private function calculatePercentage($old, $new)

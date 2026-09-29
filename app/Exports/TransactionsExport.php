@@ -11,18 +11,19 @@ use Carbon\Carbon;
 
 class TransactionsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize
 {
-    protected $start, $end;
+    protected $start, $end, $metode;
 
-    public function __construct($start = null, $end = null)
+    public function __construct($start = null, $end = null, $metode = null)
     {
         $this->start = $start;
         $this->end = $end;
+        $this->metode = $metode;
     }
 
     public function query()
     {
         // Use eager loading for relationships to avoid 'null' data issues
-        $query = Transaksi::with(['details.produk']);
+        $query = Transaksi::with(['details.produk'])->metode($this->metode);
 
         if ($this->start && $this->end) {
             $query->whereBetween('transaction_date', [
@@ -52,7 +53,7 @@ class TransactionsExport implements FromQuery, WithHeadings, WithMapping, Should
         return [
             $transaksi->transaction_id,
             $transaksi->cashier_name ?? 'Kasir',
-            $transaksi->payment_method ?? 'Tunai',
+            $transaksi->metode_label,
             'Rp ' . number_format($transaksi->total_amount ?? 0, 0, ',', '.'),
             'Rp ' . number_format($transaksi->total_modal ?? 0, 0, ',', '.'),
             'Rp ' . number_format($transaksi->laba_kotor ?? 0, 0, ',', '.'),

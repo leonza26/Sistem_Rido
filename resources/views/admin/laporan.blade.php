@@ -92,6 +92,16 @@
                         value="{{ $end_date ?? date('Y-m-d') }}">
                 </div>
 
+                <div class="flex items-center gap-2">
+                    <label for="metode" class="text-xs font-semibold text-slate-600 uppercase">Metode:</label>
+                    <select id="metode" name="metode"
+                        class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="" @selected(! $metode)>Semua</option>
+                        <option value="tunai" @selected($metode === 'tunai')>Tunai</option>
+                        <option value="qris" @selected($metode === 'qris')>QRIS</option>
+                    </select>
+                </div>
+
                 <button type="submit"
                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 text-sm font-semibold shadow-sm">
                     Filter Laporan
@@ -233,7 +243,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full {{ strtolower($trnsk->payment_method) === 'tunai' ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800' }}">
-                                        {{ ucfirst($trnsk->payment_method) }}
+                                        {{ $trnsk->metode_label }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-slate-800">
@@ -251,7 +261,7 @@
                                             'id' => $trnsk->transaction_id,
                                             'tanggal' => $trnsk->transaction_date ? $trnsk->transaction_date->format('d-m-Y H:i') : '-',
                                             'kasir' => $trnsk->cashier_name ?? 'Kasir',
-                                            'metode' => ucfirst($trnsk->payment_method),
+                                            'metode' => $trnsk->metode_label,
                                             'total_omzet' => (float) $trnsk->total_amount,
                                             'total_modal' => (float) $trnsk->total_modal,
                                             'total_laba' => (float) $trnsk->laba_kotor,

@@ -48,4 +48,31 @@ class Transaksi extends Model
     {
         return $this->total_amount - $this->total_modal;
     }
+
+    /**
+     * Label metode pembayaran untuk tampilan (tunai -> Tunai, qris -> QRIS).
+     */
+    public function getMetodeLabelAttribute(): string
+    {
+        $metode = strtolower((string) $this->payment_method);
+
+        return match ($metode) {
+            '' => '-',
+            'tunai' => 'Tunai',
+            'qris' => 'QRIS',
+            default => ucwords(str_replace('_', ' ', $metode)),
+        };
+    }
+
+    /**
+     * Filter metode pembayaran pada laporan: tunai, qris (semua non-tunai), atau semua.
+     */
+    public function scopeMetode($query, ?string $metode)
+    {
+        return match ($metode) {
+            'tunai' => $query->whereRaw('LOWER(payment_method) = ?', ['tunai']),
+            'qris' => $query->whereRaw('LOWER(payment_method) != ?', ['tunai']),
+            default => $query,
+        };
+    }
 }

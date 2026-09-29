@@ -35,10 +35,13 @@ return [
         ],
     ],
 
-    'midtrans' => [
-        'serverKey' => env('MIDTRANS_SERVER_KEY'),
-        'clientKey' => env('MIDTRANS_CLIENT_KEY'),
-        'isProduction' => env('MIDTRANS_IS_PRODUCTION'),
+    // Pembayaran QRIS (Livin' Merchant Bank Mandiri)
+    'qris' => [
+        // teks QRIS statis toko (hasil scan QR dari Livin' Merchant)
+        'payload' => env('QRIS_PAYLOAD'),
+        // dinamis = QR per transaksi berisi nominal belanja
+        // statis  = QR toko ditampilkan apa adanya, pembeli mengetik nominal
+        'mode' => env('QRIS_MODE', 'dinamis'),
     ],
 
 ];

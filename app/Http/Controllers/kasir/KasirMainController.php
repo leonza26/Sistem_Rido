@@ -8,11 +8,13 @@ use App\Models\Kategori;
 use App\Models\Produk;
 use App\Models\Transaksi;
 use App\Models\ModalKasir;
+use App\Services\QrisService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 class KasirMainController extends Controller
@@ -87,7 +89,11 @@ class KasirMainController extends Controller
         return view('kasir.stok_barang', compact('categories'));
     }
 
-    public function checkout(Request $request)
+    /**
+     * Langkah 1 pembayaran QRIS: membuat QR berisi total belanja.
+     * Keranjang disimpan sementara di session sampai kasir mengonfirmasi pembayaran.
+     */
+    public function buatQris(Request $request)
     {
         $cart = $this->normalizeCart($request->input('cart', []));
 
@@ -95,60 +101,124 @@ class KasirMainController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Keranjang kosong'], 400);
         }
 
-        $serverKey = config('services.midtrans.serverKey');
-        $isProduction = config('services.midtrans.isProduction');
-        $apiUrl = $isProduction ? 'https://app.midtrans.com/snap/v1/transactions' : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+        // cek stok sebelum pembeli membayar
+        $produk = Produk::whereIn('id', array_column($cart, 'id'))->get()->keyBy('id');
 
-        $orderId = 'TRX-' . time() . '-' . rand(1000, 9999);
-
-        $itemDetails = [];
-        $grossAmount = 0;
         foreach ($cart as $item) {
-            $itemDetails[] = [
-                'id' => substr((string) $item['id'], 0, 50),
-                'price' => $item['price'],
-                'quantity' => $item['qty'],
-                'name' => substr($item['name'], 0, 50)
-            ];
-            $grossAmount += ($item['price'] * $item['qty']);
+            if ($produk[$item['id']]->stok_awal < $item['qty']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Stok produk {$item['name']} tidak mencukupi.",
+                ], 422);
+            }
         }
 
-        $payload = [
-            'transaction_details' => [
-                'order_id' => $orderId,
-                'gross_amount' => $grossAmount,
-            ],
-            'item_details' => $itemDetails,
-            'callbacks' => [
-                'finish' => route('kasir.transaksi.finish')
-            ]
-        ];
+        $qris = QrisService::fromConfig();
 
-        $response = Http::withBasicAuth($serverKey, '')->post($apiUrl, $payload);
+        if (! $qris->isConfigured()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'QRIS toko belum diatur. Isi QRIS_PAYLOAD di file .env.',
+            ], 422);
+        }
 
-        if ($response->successful()) {
-            session()->put("midtrans_pending_transactions.$orderId", $cart);
+        // total dihitung dari harga di database, bukan dari data browser
+        $total = (int) round(array_sum(array_map(fn ($item) => $item['price'] * $item['qty'], $cart)));
+
+        try {
+            $payload = $qris->payloadFor($total);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+        }
+
+        $orderId = 'QRIS-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
+
+        session()->put("qris_pending.$orderId", [
+            'cart' => $cart,
+            'total' => $total,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'order_id' => $orderId,
+            'total' => $total,
+            'total_formatted' => 'Rp ' . number_format($total, 0, ',', '.'),
+            'qris_payload' => $payload,
+            'mode' => $qris->mode(),
+            'merchant_name' => $qris->merchantName(),
+            'nmid' => $qris->nmid(),
+        ]);
+    }
+
+    /**
+     * Langkah 2 pembayaran QRIS: kasir menekan "Pembayaran Diterima" setelah
+     * notifikasi pembayaran muncul di aplikasi Livin' Merchant.
+     */
+    public function konfirmasiQris(string $orderId)
+    {
+        // sudah pernah dikonfirmasi (misalnya tombol ditekan dua kali)
+        $sudahTersimpan = Transaksi::where('transaction_id', $orderId)->first();
+
+        if ($sudahTersimpan) {
+            session()->forget("qris_pending.$orderId");
 
             return response()->json([
                 'status' => 'success',
-                'snap_token' => $response->json('token'),
-                'order_id' => $orderId
+                'message' => 'Transaksi QRIS sudah tersimpan.',
+                'transaction_id' => $sudahTersimpan->transaction_id,
             ]);
         }
 
+        $pending = session("qris_pending.$orderId");
+
+        if (! $pending) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Transaksi QRIS tidak ditemukan atau sudah dibatalkan.',
+            ], 404);
+        }
+
+        try {
+            $transaksi = $this->persistTransaction($orderId, 'qris', $pending['cart']);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage() ?: 'Gagal menyimpan transaksi QRIS.',
+            ], 422);
+        }
+
+        session()->forget("qris_pending.$orderId");
+
         return response()->json([
-            'status' => 'error',
-            'message' => 'Gagal terhubung dengan Midtrans',
-            'debug' => $response->json()
-        ], 500);
+            'status' => 'success',
+            'message' => 'Pembayaran QRIS diterima dan transaksi tersimpan.',
+            'transaction_id' => $transaksi->transaction_id,
+            'total' => (int) $transaksi->total_amount,
+        ]);
+    }
+
+    /**
+     * Pembeli batal membayar: QR dibuang, tidak ada transaksi yang disimpan.
+     */
+    public function batalQris(string $orderId)
+    {
+        session()->forget("qris_pending.$orderId");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Pembayaran QRIS dibatalkan.',
+        ]);
     }
 
     public function simpanTransaksi(Request $request)
     {
         try {
+            // dipakai untuk transaksi tunai; pembayaran QRIS disimpan lewat konfirmasiQris()
             $request->validate([
                 'order_id' => ['required', 'string'],
-                'payment_type' => ['required', 'string'],
+                'payment_type' => ['required', 'string', 'in:tunai'],
                 'cart' => ['required', 'array', 'min:1'],
             ]);
 
@@ -169,63 +239,6 @@ class KasirMainController extends Controller
             return response()->json([
                 'message' => $e->getMessage() ?: 'Gagal menyimpan transaksi',
             ], 422);
-        }
-    }
-
-    public function finishTransaksi(Request $request)
-    {
-        $orderId = $request->query('order_id');
-
-        if (! $orderId) {
-            return redirect()
-                ->route('kasir.transaksi')
-                ->with('error', 'Order ID Midtrans tidak ditemukan.');
-        }
-
-        try {
-            $serverKey = config('services.midtrans.serverKey');
-            $isProduction = config('services.midtrans.isProduction');
-            $statusUrl = $isProduction
-                ? "https://api.midtrans.com/v2/{$orderId}/status"
-                : "https://api.sandbox.midtrans.com/v2/{$orderId}/status";
-
-            $response = Http::withBasicAuth($serverKey, '')->get($statusUrl);
-
-            if (! $response->successful()) {
-                return redirect()
-                    ->route('kasir.transaksi')
-                    ->with('error', 'Gagal memverifikasi status pembayaran Midtrans.');
-            }
-
-            $status = $response->json('transaction_status');
-            $paymentType = $response->json('payment_type', 'midtrans');
-
-            if (! in_array($status, ['capture', 'settlement'], true)) {
-                return redirect()
-                    ->route('kasir.transaksi')
-                    ->with('error', 'Pembayaran belum berhasil diselesaikan.');
-            }
-
-            $cart = session()->get("midtrans_pending_transactions.$orderId", []);
-
-            if (empty($cart)) {
-                return redirect()
-                    ->route('kasir.transaksi')
-                    ->with('error', 'Data keranjang transaksi Midtrans tidak ditemukan.');
-            }
-
-            $this->persistTransaction($orderId, $paymentType, $cart);
-            session()->forget("midtrans_pending_transactions.$orderId");
-
-            return redirect()
-                ->route('kasir.transaksi')
-                ->with('success', 'Pembayaran Midtrans berhasil dan transaksi telah disimpan.');
-        } catch (Throwable $e) {
-            report($e);
-
-            return redirect()
-                ->route('kasir.transaksi')
-                ->with('error', $e->getMessage() ?: 'Terjadi kesalahan saat menyimpan transaksi Midtrans.');
         }
     }
 
@@ -293,14 +306,17 @@ class KasirMainController extends Controller
                     throw new \RuntimeException("Stok produk {$produk->nama_produk} tidak mencukupi.");
                 }
 
-                $subtotal = $produk->harga * $item['qty'];
+                // harga diambil saat keranjang diproses (untuk QRIS: saat QR dibuat),
+                // sehingga total yang tersimpan sama dengan nominal di QR
+                $harga = $item['price'] ?? $produk->harga;
+                $subtotal = $harga * $item['qty'];
                 $total += $subtotal;
 
                 DetailTransaksi::create([
                     'transaksi_id' => $transaksi->id,
                     'produk_id' => $produk->id,
                     'qty' => $item['qty'],
-                    'harga' => $produk->harga,
+                    'harga' => $harga,
                     'harga_modal' => $produk->harga_modal ?? 0,
                     'subtotal' => $subtotal,
                 ]);

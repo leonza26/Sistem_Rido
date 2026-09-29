@@ -59,10 +59,15 @@ Route::middleware(['auth', 'verified', 'rolemanager:kasir'])->group(function () 
 
             // transaksi
             Route::get('/transaksi', 'transaksi')->name('kasir.transaksi');
-            Route::get('/transaksi/finish', 'finishTransaksi')->name('kasir.transaksi.finish');
-            Route::post('/transaksi/checkout', 'checkout')->name('kasir.transaksi.checkout');
             Route::get('/stok_barang', 'stok_barang')->name('kasir.stok_barang');
+
+            // pembayaran tunai
             Route::post('/simpan-transaksi', 'simpanTransaksi')->name('kasir.simpanTransaksi');
+
+            // pembayaran QRIS: buat QR -> kasir konfirmasi setelah notifikasi Livin' Merchant masuk
+            Route::post('/transaksi/qris', 'buatQris')->name('kasir.transaksi.qris');
+            Route::post('/transaksi/qris/{orderId}/konfirmasi', 'konfirmasiQris')->name('kasir.transaksi.qris.konfirmasi');
+            Route::post('/transaksi/qris/{orderId}/batal', 'batalQris')->name('kasir.transaksi.qris.batal');
         });
     });
 });
