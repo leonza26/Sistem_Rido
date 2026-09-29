@@ -22,12 +22,17 @@
 
         <nav class="flex-1 overflow-y-auto py-6 px-4 custom-scrollbar">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 mb-4 sidebar-text transition-opacity duration-300">
-                Menu Admin
+                Menu {{ Auth::user()->roleLabel() }}
             </p>
 
             <ul class="space-y-1.5">
-                @php $current = request()->segment(2); @endphp
+                @php
+                    $current = request()->segment(2);
+                    // Pemilik: semua menu. Admin: hanya Produk dan Pengguna.
+                    $isPemilik = Auth::user()->isPemilik();
+                @endphp
 
+                @if ($isPemilik)
                 <li>
                     <a href="{{ route('admin') }}"
                         class="group flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative
@@ -45,6 +50,7 @@
                         @endif
                     </a>
                 </li>
+                @endif
 
                 <li>
                     <a href="{{ route('admin.products') }}"
@@ -64,6 +70,7 @@
                     </a>
                 </li>
 
+                @if ($isPemilik)
                 <li>
                     <a href="{{ route('admin.laporan') }}"
                         class="group flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative
@@ -81,6 +88,7 @@
                         @endif
                     </a>
                 </li>
+                @endif
 
                 <li>
                     <a href="{{ route('admin.manage_pengguna') }}"
@@ -100,6 +108,7 @@
                     </a>
                 </li>
 
+                @if ($isPemilik)
                 <li>
                     <a href="{{ route('admin.modal_kasir') }}"
                         class="group flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative
@@ -117,6 +126,7 @@
                         @endif
                     </a>
                 </li>
+                @endif
             </ul>
         </nav>
 
@@ -130,7 +140,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
                         </svg>
                     </div>
-                    <span class="ml-3 sidebar-text">Logout Admin</span>
+                    <span class="ml-3 sidebar-text">Logout {{ Auth::user()->roleLabel() }}</span>
                 </button>
             </form>
         </div>

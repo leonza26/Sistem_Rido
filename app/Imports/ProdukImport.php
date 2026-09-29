@@ -17,6 +17,14 @@ class ProdukImport implements ToCollection, WithHeadingRow, WithEvents
 {
     private $images = [];
 
+    /**
+     * @param  bool  $bolehIsiHargaModal  true jika yang mengimpor adalah Pemilik.
+     *                                    Untuk Admin, kolom Harga Modal diabaikan.
+     */
+    public function __construct(private bool $bolehIsiHargaModal = true)
+    {
+    }
+
     public function collection(Collection $rows)
     {
         foreach ($rows as $index => $row) {
@@ -55,10 +63,14 @@ class ProdukImport implements ToCollection, WithHeadingRow, WithEvents
                 // Update
                 $updateData = [
                     'kategori_id' => $kategori->id,
-                    'harga_modal' => $hargaModal,
                     'harga' => $harga,
                     'stok_awal' => $stokAwal,
                 ];
+
+                // harga modal lama tidak diubah jika yang mengimpor adalah Admin
+                if ($this->bolehIsiHargaModal) {
+                    $updateData['harga_modal'] = $hargaModal;
+                }
 
                 // Update foto jika ada foto baru
                 if ($fotoPath) {
@@ -74,7 +86,7 @@ class ProdukImport implements ToCollection, WithHeadingRow, WithEvents
                 Produk::create([
                     'nama_produk' => $namaProduk,
                     'kategori_id' => $kategori->id,
-                    'harga_modal' => $hargaModal,
+                    'harga_modal' => $this->bolehIsiHargaModal ? $hargaModal : 0,
                     'harga' => $harga,
                     'stok_awal' => $stokAwal,
                     'foto_produk' => $fotoPath,

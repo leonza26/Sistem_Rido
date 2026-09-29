@@ -114,11 +114,18 @@
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label for="harga_modal" class="block text-sm font-medium text-slate-700">Harga Modal (Harga Beli/Dasar)</label>
-                        <input type="number" id="harga_modal" name="harga_modal"
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required min="0">
-                    </div>
+                    {{-- harga modal hanya dapat dilihat dan diisi oleh Pemilik --}}
+                    @if (Auth::user()->isPemilik())
+                        <div>
+                            <label for="harga_modal" class="block text-sm font-medium text-slate-700">Harga Modal (Harga Beli/Dasar)</label>
+                            <input type="number" id="harga_modal" name="harga_modal"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required min="0">
+                        </div>
+                    @else
+                        <p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                            Harga modal diisi oleh Pemilik.
+                        </p>
+                    @endif
                     <div>
                         <label for="harga" class="block text-sm font-medium text-slate-700">Harga Jual</label>
                         <input type="number" id="harga" name="harga"

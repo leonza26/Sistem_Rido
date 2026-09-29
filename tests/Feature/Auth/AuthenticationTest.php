@@ -9,7 +9,7 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['role' => User::ROLE_KASIR]);
 
     $response = $this->post('/login', [
         'email' => $user->email,
@@ -17,7 +17,8 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    // setelah login, pengguna diarahkan ke halaman awal sesuai role (kasir -> dashboard kasir)
+    $response->assertRedirect(route('kasir', absolute: false));
 });
 
 test('users can not authenticate with invalid password', function () {

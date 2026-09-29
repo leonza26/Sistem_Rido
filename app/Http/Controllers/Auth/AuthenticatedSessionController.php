@@ -28,13 +28,20 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        $authUserRole = Auth::user()->role;
+        // arahkan ke halaman awal sesuai role:
+        // Pemilik -> Dashboard, Admin -> Produk, Kasir -> Dashboard kasir
+        $homeRoute = Auth::user()->homeRoute();
 
-        if ($authUserRole == 0) {
-            return redirect()->intended(route('admin', absolute: false));
-        } else {
-            return redirect()->intended(route('kasir', absolute: false));
+        if ($homeRoute === null) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Role akun Anda tidak valid. Hubungi pemilik atau admin.']);
         }
+
+        return redirect()->intended(route($homeRoute, absolute: false));
     }
 
     /**

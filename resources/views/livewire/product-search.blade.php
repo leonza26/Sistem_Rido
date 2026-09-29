@@ -60,9 +60,11 @@
                      <th scope="col"
                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori
                      </th>
-                     <th scope="col"
-                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Modal
-                     </th>
+                     @if ($tampilkanHargaModal)
+                         <th scope="col"
+                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Modal
+                         </th>
+                     @endif
                      <th scope="col"
                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Jual
                      </th>
@@ -80,8 +82,17 @@
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ $product->nama_produk }}</td>
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                              {{ $product->kategori->nama_kategori ?? 'Tanpa Kategori' }}</td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">Rp
-                             {{ number_format($product->harga_modal ?? 0, 0, ',', '.') }}</td>
+                         @if ($tampilkanHargaModal)
+                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
+                                 @if (($product->harga_modal ?? 0) > 0)
+                                     Rp {{ number_format($product->harga_modal, 0, ',', '.') }}
+                                 @else
+                                     <span
+                                         class="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">Belum
+                                         diisi</span>
+                                 @endif
+                             </td>
+                         @endif
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">Rp
                              {{ number_format($product->harga, 0, ',', '.') }}</td>
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $product->stok_awal }}</td>
@@ -89,7 +100,7 @@
                              <button class="btn-edit text-indigo-600 hover:text-indigo-900"
                                  data-id="{{ $product->id }}" data-nama="{{ $product->nama_produk }}"
                                  data-kategori="{{ $product->kategori_id }}"
-                                 data-harga-modal="{{ $product->harga_modal ?? 0 }}"
+                                 @if ($tampilkanHargaModal) data-harga-modal="{{ $product->harga_modal ?? 0 }}" @endif
                                  data-harga="{{ $product->harga }}"
                                  data-stok="{{ $product->stok_awal }}" data-foto="{{ $product->foto_produk }}">
                                  Edit
@@ -103,7 +114,7 @@
                      </tr>
                  @empty
                      <tr>
-                         <td colspan="6" class="px-6 py-12 text-center bg-gray-50">
+                         <td colspan="{{ $tampilkanHargaModal ? 6 : 5 }}" class="px-6 py-12 text-center bg-gray-50">
                              <div class="flex flex-col items-center justify-center">
                                  <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor"
                                      viewBox="0 0 24 24">

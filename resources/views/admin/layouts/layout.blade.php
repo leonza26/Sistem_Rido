@@ -58,11 +58,11 @@
                 <div class="flex items-center gap-3 border-l pl-4 border-gray-100">
                     <div class="hidden sm:block text-right leading-tight">
                         <div class="text-sm font-bold text-slate-700">{{ Auth::user()->name }}</div>
-                        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Administrator</div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{{ Auth::user()->roleLabel() }}</div>
                     </div>
                     <div
                         class="h-9 w-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold">
-                        A
+                        {{ substr(Auth::user()->roleLabel(), 0, 1) }}
                     </div>
                 </div>
             </div>
@@ -70,6 +70,13 @@
 
         <main class="flex-1 p-4 sm:p-6 lg:p-8">
             <div class="max-w-7xl mx-auto">
+                {{-- pesan saat pengguna membuka halaman yang bukan haknya --}}
+                @if (session('akses_ditolak'))
+                    <div class="mb-6 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-sm font-medium text-red-700">
+                        {{ session('akses_ditolak') }}
+                    </div>
+                @endif
+
                 @yield('content')
             </div>
         </main>

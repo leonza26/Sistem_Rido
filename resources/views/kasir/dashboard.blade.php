@@ -54,7 +54,7 @@
             </span>
         </div>
         <p class="text-2xl font-bold text-violet-600">Rp {{ number_format($todayNonCash, 0, ',', '.') }}</p>
-        <p class="text-xs text-slate-500 mt-1">QRIS / Transfer / Midtrans</p>
+        <p class="text-xs text-slate-500 mt-1">Pembayaran QRIS</p>
     </div>
 
     <!-- Card 4: Modal Awal Kasir -->

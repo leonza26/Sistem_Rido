@@ -13,9 +13,16 @@ use App\Models\Kategori;
 
 class ProdukTemplateExport implements WithHeadings, WithStyles, ShouldAutoSize, WithEvents
 {
+    /**
+     * @param  bool  $denganHargaModal  true untuk Pemilik. Template Admin tidak memuat kolom Harga Modal.
+     */
+    public function __construct(private bool $denganHargaModal = true)
+    {
+    }
+
     public function headings(): array
     {
-        return [
+        $headings = [
             'Nama Produk',
             'Nama Kategori',
             'Harga Modal',
@@ -23,6 +30,12 @@ class ProdukTemplateExport implements WithHeadings, WithStyles, ShouldAutoSize, 
             'Stok Awal',
             'Foto Produk (Gambar)'
         ];
+
+        if (! $this->denganHargaModal) {
+            $headings = array_values(array_diff($headings, ['Harga Modal']));
+        }
+
+        return $headings;
     }
 
     public function styles(Worksheet $sheet)

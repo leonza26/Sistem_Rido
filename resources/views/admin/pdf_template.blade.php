@@ -26,6 +26,7 @@
 
     <div class="info">
         <strong>Periode:</strong> {{ $start ?? 'Semua' }} s/d {{ $end ?? 'Sekarang' }}<br>
+        <strong>Metode:</strong> {{ ['tunai' => 'Tunai', 'qris' => 'QRIS'][$metode ?? ''] ?? 'Semua' }}<br>
         <strong>Waktu Cetak:</strong> {{ now()->format('d/m/Y H:i') }} WIB
     </div>
 
@@ -46,7 +47,7 @@
             <tr>
                 <td>#{{ $t->transaction_id }}</td>
                 <td>{{ $t->cashier_name ?? 'Kasir' }}</td>
-                <td>{{ ucfirst($t->payment_method ?? '-') }}</td>
+                <td>{{ $t->metode_label }}</td>
                 <td>{{ $t->transaction_date ? $t->transaction_date->format('d/m/Y H:i') : '-' }}</td>
                 <td class="text-right">Rp {{ number_format($t->total_amount, 0, ',', '.') }}</td>
                 <td class="text-right">Rp {{ number_format($t->total_modal, 0, ',', '.') }}</td>
